@@ -319,7 +319,7 @@ function Bar:Update()
     local dps = tickVal * 2
     local tickHpPct = 0
     if maxHP > 0 and dps > 0 then
-        tickHpPct = math.floor(Utils.SafeDiv(dps, maxHP) * 100)
+        tickHpPct = math.floor(Utils.SafeDiv(dps, maxHP) * 1000)
     end
 
     -- Build data table for templates

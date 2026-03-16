@@ -45,20 +45,20 @@ local DB_DEFAULTS = {
 
         -- Text — label
         -- Text — templates (use flags: %s %r %p %t %d %tp %m %n)
-        labelTemplate = "%n",
-        pctTemplate   = "%p",
-        tickTemplate  = "%d/s  (%tp)",
+        labelTemplate = "%n: %s",
+        pctTemplate   = "(%tp % /s)",
+        tickTemplate  = "%d/s",
         fontFace     = "Friz Quadrata TT",
-        fontSize     = 12,
+        fontSize     = 13,
         fontOutline  = "OUTLINE",
         labelAnchor  = "LEFT",
-        labelXOfs    = 4,
+        labelXOfs    = 2,
         labelYOfs    = 0,
 
         -- Text — percentage
         showPercentage = true,
         pctAnchor      = "RIGHT",
-        pctXOfs        = -4,
+        pctXOfs        = -2,
         pctYOfs        = 0,
 
         -- Number format: 1=raw, 2=k/m, 3=mil/M, 4=K/M
