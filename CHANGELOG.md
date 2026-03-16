@@ -1,5 +1,10 @@
 # StaggerBar Changelog
 
+## v1.1.0 (2026-03-16)
+### Changes since v1.0.0:
+
+
+
 ## v1.0.0 (2026-03-16)
 - Release v1.0.0
 
