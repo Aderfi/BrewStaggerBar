@@ -1,0 +1,25 @@
+## Interface: 120001
+## Title: |cff00ccffStaggerBar|r
+## Notes: Brewmaster Monk Stagger tracking bar with configurable colors, textures, fonts and tick display. Midnight-compatible.
+## Author: Aderfi
+## Version: 1.0.0
+## SavedVariables: StaggerBarDB
+## IconTexture: Interface\Icons\monk_stance_drunkenox
+## X-Category: Monk
+## X-License: GNUv3
+
+# Libraries
+Libraries\init.xml
+
+# Locales
+Locales\enUS.lua
+Locales\esES.lua
+
+# Core
+Core\Utils.lua
+Core\Bar.lua
+Core\Core.lua
+
+# Modules & GUI
+Modules\Options.lua
+GUI.lua
