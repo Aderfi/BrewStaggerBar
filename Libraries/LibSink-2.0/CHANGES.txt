@@ -1,0 +1,9 @@
+------------------------------------------------------------------------
+r198 | funkehdude | 2026-01-21 16:38:27 +0000 (Wed, 21 Jan 2026) | 1 line
+Changed paths:
+   M /trunk/.luacheckrc
+   M /trunk/LibSink-2.0/LibSink-2.0.lua
+
+Fix Floating Combat Text for WoW 12
+------------------------------------------------------------------------
+
