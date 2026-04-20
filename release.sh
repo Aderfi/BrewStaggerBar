@@ -156,7 +156,19 @@ if [[ "$push_confirm" =~ ^[Yy]$ ]]; then
 else
     echo "   Skipped. Push manually:"
     echo "     git push origin HEAD --follow-tags"
+    echo ""
+    echo "Done! ${TAG} released → ${ZIP_NAME}"
+    exit 0
 fi
 
+# 7. Create GitHub Release -------------------------------------------------
+echo ""
+echo "── Creating GitHub Release ${TAG}…"
+
+gh release create "$TAG" "$ZIP_NAME" \
+    --title "$TAG" \
+    --notes "$CHANGELOG_BODY"
+
+echo "   ✓ GitHub Release created"
 echo ""
 echo "Done! ${TAG} released → ${ZIP_NAME}"
