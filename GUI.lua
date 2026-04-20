@@ -17,6 +17,10 @@ local function InjectProfilesTab()
     ns.options.args.profiles = AceDBOptions:GetOptionsTable(ns.db)
     ns.options.args.profiles.order = 99
 
+    -- LibDualSpec — adds spec-switch dropdown into profiles tab
+    local LDS = LibStub("LibDualSpec-1.0", true)
+    if LDS then LDS:EnhanceOptions(ns.options.args.profiles, ns.db) end
+
     LibStub("AceConfigRegistry-3.0"):RegisterOptionsTable(ADDON_NAME, ns.options)
 end
 
@@ -27,21 +31,25 @@ local function RegisterDialogPanel()
     local ACD = LibStub("AceConfigDialog-3.0", true)
     if not ACD then return end
 
-    ACD:AddToBlizOptions(ADDON_NAME, "|cff00ccffStaggerBar|r")
+    ACD:AddToBlizOptions(ADDON_NAME, "|cff00ccffBrewStaggerBar|r")
 
     local tabs = {
-        { key = "general", name = L["General"] },
-        { key = "bar",     name = L["Bar"] },
-        { key = "colors",  name = L["Colors"] },
-        { key = "text",    name = L["Text"] },
-        { key = "ticks",   name = L["Tick Display"] },
+        { key = "general",   name = L["General"] },
+        { key = "bar",       name = L["Bar"] },
+        { key = "colors",    name = L["Colors"] },
+        { key = "glow",      name = "Glow" },
+        { key = "text",      name = L["Text"] },
+        { key = "ticks",     name = L["Tick Display"] },
+        { key = "alerts",      name = L["Sound"] },
+        { key = "sparkline",   name = L["Sparkline"] },
+        { key = "importexport", name = "Import / Export" },
     }
     for _, t in ipairs(tabs) do
-        ACD:AddToBlizOptions(ADDON_NAME, t.name, "|cff00ccffStaggerBar|r", t.key)
+        ACD:AddToBlizOptions(ADDON_NAME, t.name, "|cff00ccffBrewStaggerBar|r", t.key)
     end
 
     if ns.options.args.profiles then
-        ACD:AddToBlizOptions(ADDON_NAME, "Profiles", "|cff00ccffStaggerBar|r", "profiles")
+        ACD:AddToBlizOptions(ADDON_NAME, "Profiles", "|cff00ccffBrewStaggerBar|r", "profiles")
     end
 end
 
@@ -63,7 +71,7 @@ local function SetupMinimapButton()
     local dataObj = LDB:NewDataObject(ADDON_NAME, {
         type  = "launcher",
         icon  = "Interface\\Icons\\monk_stance_drunkenox",
-        label = "StaggerBar",
+        label = "BrewStaggerBar",
         OnClick = function(_, button)
             if button == "LeftButton" then
                 if Bar:IsShown() then Bar:Hide() else Bar:Show() end
@@ -79,6 +87,10 @@ local function SetupMinimapButton()
 
     local LDBIcon = LibStub("LibDBIcon-1.0", true)
     if LDBIcon then LDBIcon:Register(ADDON_NAME, dataObj, ns.db and ns.db.profile) end
+
+    -- LibDBCompartment — Midnight addon compartment button
+    local LDC = LibStub("LibDBCompartment-1.0", true)
+    if LDC then LDC:Register(dataObj) end
 end
 
 ------------------------------------------------------------------------

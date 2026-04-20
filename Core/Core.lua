@@ -4,7 +4,11 @@
 ------------------------------------------------------------------------
 local ADDON_NAME, ns = ...
 
-local StaggerBar = LibStub("AceAddon-3.0"):NewAddon(ADDON_NAME, "AceConsole-3.0")
+local LibSink = LibStub("LibSink-2.0", true)
+local mixins = { "AceConsole-3.0" }
+if LibSink then table.insert(mixins, "LibSink-2.0") end
+
+local StaggerBar = LibStub("AceAddon-3.0"):NewAddon(ADDON_NAME, unpack(mixins))
 ns.addon = StaggerBar
 
 local Utils = ns.Utils
@@ -20,12 +24,22 @@ local DB_DEFAULTS = {
         locked         = false,
         updateInterval = 2,
         testMode       = false,
+        smoothBar      = true,
+
+        -- Visibility
+        hideOutOfCombat  = false,
+        hideInTown       = false,
+        hideAtFullHP     = false,
+        combatFadeDelay  = 3,      -- seconds to wait after combat ends before hiding
 
         -- Bar
         barWidth    = 250,
         barHeight   = 22,
         barTexture  = "Blizzard",
         bgOpacity   = 0.5,
+        barOrientation = "HORIZONTAL",  -- HORIZONTAL or VERTICAL
+        barMaxPct = 10,                -- max % of HP for bar scaling (e.g. 10 = 1000%)
+        barOverflowWrap = false,       -- false = clamp at max, true = refill cyclically
 
         -- Position
         position = {
@@ -35,53 +49,102 @@ local DB_DEFAULTS = {
             yOfs     = -200,
         },
 
+        -- Border
+        borderTexture  = "Blizzard Tooltip",
+        borderSize     = 12,
+        borderColor    = { 0, 0, 0, 0.9 },
+
         -- Colors (RGBA)
         colorLight    = { 0.30, 0.80, 0.30, 1 },
         colorModerate = { 1.00, 0.80, 0.00, 1 },
         colorHeavy    = { 1.00, 0.20, 0.20, 1 },
-        colorExtreme  = { 1.00, 0.00, 0.00, 1 },
-        bgExtreme     = { 1, 0, 0 },
+        colorExtreme  = { 0.80, 0.00, 0.80, 1 },
+        bgExtreme     = { 0.5, 0, 0.5 },
         bgNormal      = { 0, 0, 0 },
 
         -- Text — label
-        -- Text — templates (use flags: %s %r %p %t %d %tp %m %n)
-        labelTemplate = "%n: %s",
-        pctTemplate   = "(%tp % /s)",
-        tickTemplate  = "%d/s",
+        -- Text — templates (use flags: %s %r %p %t %d %tp %m %n %a %purify)
+        labelTemplate = "%d (%tp)",
+        pctTemplate   = "%p",
+        tickTemplate  = "%d/s  (%tp)",
+
+        -- Global font (fallback)
         fontFace     = "Friz Quadrata TT",
-        fontSize     = 13,
+        fontSize     = 12,
         fontOutline  = "OUTLINE",
+
+        -- Label font overrides (nil = use global)
+        labelFontFace    = nil,
+        labelFontSize    = nil,
+        labelFontOutline = nil,
         labelAnchor  = "LEFT",
-        labelXOfs    = 2,
+        labelXOfs    = 4,
         labelYOfs    = 0,
 
         -- Text — percentage
-        showPercentage = true,
-        pctAnchor      = "RIGHT",
-        pctXOfs        = -2,
-        pctYOfs        = 0,
+        showPercentage   = true,
+        pctFontFace      = nil,
+        pctFontSize      = nil,
+        pctFontOutline   = nil,
+        pctAnchor        = "RIGHT",
+        pctXOfs          = -4,
+        pctYOfs          = 0,
 
         -- Number format: 1=raw, 2=k/m, 3=mil/M, 4=K/M
         numberFormat = 2,
 
         -- Tick display
-        showTickPercent = true,
-        tickAnchor      = "BOTTOM",
-        tickXOfs        = 0,
-        tickYOfs        = -2,
+        showTick         = false,
+        tickFontFace     = nil,
+        tickFontSize     = 10,
+        tickFontOutline  = nil,
+        tickAnchor       = "BOTTOM",
+        tickXOfs         = 0,
+        tickYOfs         = -2,
+
+        -- Sound alerts
+        soundEnabled     = false,
+        soundTier        = 3,          -- tier that triggers sound
+        soundFile        = "Raid Warning",
+        soundCooldown    = 5,          -- seconds between alerts
+
+        -- Combat log output
+        chatLogEnabled   = false,
+        chatLogTier      = 4,          -- tier to log
+
+        -- Sparkline history
+        sparklineEnabled = false,
+        sparklineHeight  = 12,
+        sparklineSamples = 30,      -- number of data points
+        sparklineColor   = { 1, 1, 1, 0.6 },
+        sparklineYOfs    = 0,
 
         -- Glow (LibCustomGlow)
         glowEnabled    = true,
         glowTier       = 4,
-        glowType       = "Autocast",     -- Pixel, AutoCast, Button, Proc
+        glowType       = "AutoCast",     -- Pixel, AutoCast, Button, Proc
         glowColor      = { 1, 0, 0, 0.8 },
-        glowLines      = 8,           -- N for Pixel / particle groups for AutoCast
-        glowFrequency  = 0.25,
-        glowLength     = nil,          -- nil = auto
-        glowThickness  = 2,
-        glowScale      = 1,
         glowXOffset    = 0,
         glowYOffset    = 0,
+
+        -- Pixel glow params
+        glowPixelLines     = 8,
+        glowPixelFrequency = 0.25,
+        glowPixelLength    = nil,       -- nil = auto
+        glowPixelThickness = 2,
+        glowPixelBorder    = false,
+
+        -- AutoCast glow params
+        glowACParticles    = 8,
+        glowACFrequency    = 0.25,
+        glowACScale        = 1,
+
+        -- Button glow params
+        glowButtonFrequency = 0.25,
+
+        -- Proc glow params
+        glowProcDuration   = 1,
+        glowProcStartAnim  = true,
     },
 }
 
@@ -89,12 +152,16 @@ local DB_DEFAULTS = {
 -- OnInitialize
 ------------------------------------------------------------------------
 function StaggerBar:OnInitialize()
-    self.db = LibStub("AceDB-3.0"):New("StaggerBarDB", DB_DEFAULTS, true)
+    self.db = LibStub("AceDB-3.0"):New("BrewStaggerBarDB", DB_DEFAULTS, true)
     ns.db   = self.db
 
     self.db.RegisterCallback(self, "OnProfileChanged", "RefreshConfig")
     self.db.RegisterCallback(self, "OnProfileCopied",  "RefreshConfig")
     self.db.RegisterCallback(self, "OnProfileReset",   "RefreshConfig")
+
+    -- LibDualSpec — auto-switch profile per spec
+    local LDS = LibStub("LibDualSpec-1.0", true)
+    if LDS then LDS:EnhanceDatabase(self.db, ADDON_NAME) end
 
     -- Build options table (defined in Modules/Options.lua)
     if ns.BuildOptions then ns.BuildOptions() end
@@ -110,34 +177,80 @@ function StaggerBar:OnEnable()
     Bar:Create()
     Bar:ApplySettings()
 
-    -- OnUpdate loop
+    -- OnUpdate loop (dt is real elapsed seconds from the engine)
     Bar.frame:SetScript("OnUpdate", function(frame, dt)
         frame.elapsed = frame.elapsed + dt
-        if frame.elapsed < frame.throttle then return end
+        local interval = 1 / (frame.updatesPerSec or 2)
+        if frame.elapsed < interval then return end
+        frame.dt = frame.elapsed       -- pass real dt to Update
         frame.elapsed = 0
         Bar:Update()
     end)
 
-    -- Spec / zone change events
+    -- Spec / zone / combat events
     local ef = Bar.frame
     ef:RegisterEvent("PLAYER_SPECIALIZATION_CHANGED")
     ef:RegisterEvent("PLAYER_ENTERING_WORLD")
     ef:RegisterEvent("PLAYER_TALENT_UPDATE")
-    ef:SetScript("OnEvent", function()
-        self:UpdateVisibility()
+    ef:RegisterEvent("PLAYER_REGEN_DISABLED")   -- entered combat
+    ef:RegisterEvent("PLAYER_REGEN_ENABLED")    -- left combat
+    ef:RegisterEvent("PLAYER_UPDATE_RESTING")   -- entered/left town
+    ef:RegisterEvent("ZONE_CHANGED_NEW_AREA")
+    ef:SetScript("OnEvent", function(_, event)
+        if event == "PLAYER_REGEN_DISABLED" then
+            -- Entered combat — cancel any pending fade and show
+            self._combatFading = false
+            if self._fadeTimer then self._fadeTimer:Cancel(); self._fadeTimer = nil end
+            self:UpdateVisibility()
+        elseif event == "PLAYER_REGEN_ENABLED" then
+            -- Left combat — start fade delay if configured
+            local delay = self.db.profile.combatFadeDelay or 3
+            if self.db.profile.hideOutOfCombat and delay > 0 then
+                self._combatFading = true
+                self._fadeTimer = C_Timer.NewTimer(delay, function()
+                    self._combatFading = false
+                    self:UpdateVisibility()
+                end)
+            else
+                self:UpdateVisibility()
+            end
+        else
+            self:UpdateVisibility()
+        end
     end)
 
     self:UpdateVisibility()
-    self:Print(L["StaggerBar"] .. " loaded.  /sb help")
+    self:Print(L["StaggerBar"] .. " loaded.  /bsb help")
 end
 
 ------------------------------------------------------------------------
--- Visibility — Brewmaster only
+-- Visibility — Brewmaster only + conditional rules
 ------------------------------------------------------------------------
 function StaggerBar:UpdateVisibility()
     if not Bar or not Bar.frame then return end
-    if self.db.profile.testMode then Bar:Show(); return end
-    if Utils.IsBrewing() then Bar:Show() else Bar:Hide() end
+    local p = self.db.profile
+
+    -- Test mode always visible
+    if p.testMode then Bar:Show(); return end
+
+    -- Must be Brewmaster
+    if not Utils.IsBrewing() then Bar:Hide(); return end
+
+    -- Hide in town/rest area
+    if p.hideInTown and IsResting() then Bar:Hide(); return end
+
+    -- Hide at full HP (no stagger)
+    if p.hideAtFullHP then
+        local stagger = Utils.SafeCall(UnitStagger, "player")
+        if not stagger or stagger == 0 then Bar:Hide(); return end
+    end
+
+    -- Hide out of combat (with fade delay handled by combat events)
+    if p.hideOutOfCombat and not InCombatLockdown() and not self._combatFading then
+        Bar:Hide(); return
+    end
+
+    Bar:Show()
 end
 
 ------------------------------------------------------------------------
@@ -181,17 +294,112 @@ function StaggerBar:SlashHandler(input)
             Bar:ApplySettings()
             self:Print("Resized to " .. w .. "x" .. h)
         else
-            self:Print("Usage: /sb size <width> <height>")
+            self:Print("Usage: /bsb size <width> <height>")
         end
+
+    elseif input == "export" then
+        self:ExportProfile()
+
+    elseif input:match("^import") then
+        local str = input:match("^import%s+(.+)")
+        if str then self:ImportProfile(str)
+        else self:Print("Usage: /bsb import <string>") end
 
     elseif input == "help" then
         self:Print("|cff00ccffStaggerBar|r commands:")
-        self:Print("  /sb            — toggle visibility")
-        self:Print("  /sb lock       — lock/unlock position")
-        self:Print("  /sb config     — open options GUI")
-        self:Print("  /sb size W H   — resize bar")
-        self:Print("  /sb reset      — reset profile")
+        self:Print("  /bsb            — toggle visibility")
+        self:Print("  /bsb lock       — lock/unlock position")
+        self:Print("  /bsb config     — open options GUI")
+        self:Print("  /bsb size W H   — resize bar")
+        self:Print("  /bsb reset      — reset profile")
+        self:Print("  /bsb export     — export profile string")
+        self:Print("  /bsb import STR — import profile string")
     else
-        self:Print("Unknown command. /sb help")
+        self:Print("Unknown command. /bsb help")
     end
+end
+
+------------------------------------------------------------------------
+-- Profile export/import (AceSerializer + LibDeflate)
+------------------------------------------------------------------------
+function StaggerBar:ExportProfile()
+    local AceSerializer = LibStub("AceSerializer-3.0", true)
+    local LibDeflate    = LibStub("LibDeflate", true)
+    if not AceSerializer or not LibDeflate then
+        self:Print("Export requires AceSerializer and LibDeflate."); return
+    end
+
+    local serialized = AceSerializer:Serialize(self.db.profile)
+    local compressed = LibDeflate:CompressDeflate(serialized)
+    local encoded    = LibDeflate:EncodeForPrint(compressed)
+
+    -- Show in a copy-paste dialog
+    if not ns.exportFrame then
+        local f = CreateFrame("Frame", "BSBExportFrame", UIParent, "BackdropTemplate")
+        f:SetSize(450, 300)
+        f:SetPoint("CENTER")
+        f:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8x8", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", edgeSize = 14, insets = {left=3,right=3,top=3,bottom=3} })
+        f:SetBackdropColor(0.05, 0.05, 0.05, 0.95)
+        f:SetFrameStrata("DIALOG")
+        f:EnableMouse(true)
+        f:SetMovable(true)
+        f:RegisterForDrag("LeftButton")
+        f:SetScript("OnDragStart", f.StartMoving)
+        f:SetScript("OnDragStop", f.StopMovingOrSizing)
+
+        local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+        title:SetPoint("TOP", 0, -8)
+        title:SetText("|cff00ccffStaggerBar|r Export")
+
+        local scroll = CreateFrame("ScrollFrame", nil, f, "UIPanelScrollFrameTemplate")
+        scroll:SetPoint("TOPLEFT", 10, -32)
+        scroll:SetPoint("BOTTOMRIGHT", -28, 36)
+
+        local eb = CreateFrame("EditBox", nil, scroll)
+        eb:SetMultiLine(true)
+        eb:SetAutoFocus(false)
+        eb:SetFontObject(ChatFontNormal)
+        eb:SetWidth(390)
+        scroll:SetScrollChild(eb)
+        f.editBox = eb
+
+        local btn = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+        btn:SetSize(80, 22)
+        btn:SetPoint("BOTTOM", 0, 8)
+        btn:SetText("Close")
+        btn:SetScript("OnClick", function() f:Hide() end)
+
+        ns.exportFrame = f
+    end
+
+    ns.exportFrame.editBox:SetText(encoded)
+    ns.exportFrame.editBox:HighlightText()
+    ns.exportFrame:Show()
+    self:Print("Profile exported. Copy the string from the window.")
+end
+
+function StaggerBar:ImportProfile(encoded)
+    local AceSerializer = LibStub("AceSerializer-3.0", true)
+    local LibDeflate    = LibStub("LibDeflate", true)
+    if not AceSerializer or not LibDeflate then
+        self:Print("Import requires AceSerializer and LibDeflate."); return
+    end
+
+    local compressed = LibDeflate:DecodeForPrint(encoded)
+    if not compressed then self:Print("|cffFF0000Import failed:|r invalid string."); return end
+
+    local serialized = LibDeflate:DecompressDeflate(compressed)
+    if not serialized then self:Print("|cffFF0000Import failed:|r decompression error."); return end
+
+    local ok, data = AceSerializer:Deserialize(serialized)
+    if not ok or type(data) ~= "table" then
+        self:Print("|cffFF0000Import failed:|r corrupt data."); return
+    end
+
+    -- Merge into current profile
+    for k, v in pairs(data) do
+        self.db.profile[k] = v
+    end
+    self:RefreshConfig()
+    self:Print("|cff00FF00Profile imported successfully.|r")
 end

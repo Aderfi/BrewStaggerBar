@@ -8,11 +8,24 @@ ns.Utils = {}
 local Utils = ns.Utils
 
 ------------------------------------------------------------------------
--- Stagger debuff spell IDs
+-- Constants (centralized)
 ------------------------------------------------------------------------
-ns.STAGGER_LIGHT    = 124273
-ns.STAGGER_MODERATE = 124274
-ns.STAGGER_HEAVY    = 124275
+ns.CONST = {
+    STAGGER_LIGHT    = 124273,
+    STAGGER_MODERATE = 124274,
+    STAGGER_HEAVY    = 124275,
+    BOB_AND_WEAVE    = 280515,
+    BASE_TICKS       = 20,    -- 10s / 0.5s
+    BAW_TICKS        = 26,    -- 13s / 0.5s (Bob and Weave)
+    TICK_RATE        = 0.5,   -- seconds per tick
+    PURIFY_PCT       = 0.50,  -- Purifying Brew clears 50%
+    TIER_THRESHOLDS  = { 0.30, 0.60, 1.00 },  -- Light/Moderate/Heavy boundaries
+}
+
+-- Backward compat aliases
+ns.STAGGER_LIGHT    = ns.CONST.STAGGER_LIGHT
+ns.STAGGER_MODERATE = ns.CONST.STAGGER_MODERATE
+ns.STAGGER_HEAVY    = ns.CONST.STAGGER_HEAVY
 
 ------------------------------------------------------------------------
 -- Safe API wrapper — returns nil if the call errors (secret values)
@@ -29,13 +42,6 @@ end
 function Utils.SafeDiv(a, b)
     if not a or not b then return nil end
     local ok, result = pcall(function() return a / b end)
-    if ok and result == result then return result end
-    return nil
-end
-
-function Utils.SafeMul(a, b)
-    if not a or not b then return nil end
-    local ok, result = pcall(function() return a * b end)
     if ok and result == result then return result end
     return nil
 end
@@ -132,10 +138,11 @@ end
 function Utils.GetStaggerTier(stagger, maxHP)
     local pct = Utils.SafeDiv(stagger, maxHP)
     if not pct then return 1, 0 end
-    if pct < 0.3 then     return 1, pct
-    elseif pct < 0.6 then return 2, pct
-    elseif pct < 1.0 then return 3, pct
-    else                   return 4, pct end
+    local T = ns.CONST.TIER_THRESHOLDS
+    if pct < T[1] then     return 1, pct
+    elseif pct < T[2] then return 2, pct
+    elseif pct < T[3] then return 3, pct
+    else                    return 4, pct end
 end
 
 ------------------------------------------------------------------------
@@ -175,14 +182,11 @@ ns.NUMBER_FORMATS = {
 ------------------------------------------------------------------------
 -- Get number of stagger ticks (20 base, 26 with Bob and Weave)
 ------------------------------------------------------------------------
-local BOB_AND_WEAVE = 280515
-
 function Utils.GetStaggerTicks()
-    -- IsPlayerSpell works for learned talents and is not combat-restricted
-    if IsPlayerSpell and IsPlayerSpell(BOB_AND_WEAVE) then
-        return 26  -- 13s / 0.5s
+    if IsPlayerSpell and IsPlayerSpell(ns.CONST.BOB_AND_WEAVE) then
+        return ns.CONST.BAW_TICKS
     end
-    return 20      -- 10s / 0.5s
+    return ns.CONST.BASE_TICKS
 end
 
 ------------------------------------------------------------------------
@@ -195,15 +199,19 @@ end
 --   %d  = DPS = tick*2 (formatted)
 --   %tp = tick as %HP per second
 --   %m  = max HP (formatted)
---   %n  = name ("Stagger")
+--   %n      = name ("Stagger")
+--   %a      = absolute stagger / maxHP  (e.g. "450k / 1.2m")
+--   %purify = value Purifying Brew would clear (50% stagger, formatted)
 ------------------------------------------------------------------------
 function Utils.FormatText(template, data, numFmt)
     if not template or template == "" then return "" end
     numFmt = numFmt or 2
-    
-    -- Order matters: %tp before %t to avoid partial match
+
+    -- Order matters: longest flags first to avoid partial match
     local result = template
+    result = result:gsub("%%purify", Utils.FormatNumber((data.stagger or 0) * ns.CONST.PURIFY_PCT, numFmt))
     result = result:gsub("%%tp", data.tickPct or "")
+    result = result:gsub("%%a",  Utils.FormatNumber(data.stagger, numFmt) .. " / " .. Utils.FormatNumber(data.maxHP, numFmt))
     result = result:gsub("%%r",  data.rawStagger or "")
     result = result:gsub("%%s",  Utils.FormatNumber(data.stagger, numFmt))
     result = result:gsub("%%d",  Utils.FormatNumber(data.dps, numFmt))
@@ -213,4 +221,38 @@ function Utils.FormatText(template, data, numFmt)
     result = result:gsub("%%n",  data.name or "Stagger")
 
     return result
+end
+
+------------------------------------------------------------------------
+-- Clamp frame position so it stays within screen bounds
+------------------------------------------------------------------------
+function Utils.ClampToScreen(frame)
+    if not frame then return end
+    local s = frame:GetEffectiveScale()
+    local sw, sh = GetScreenWidth() * s, GetScreenHeight() * s
+    local l = frame:GetLeft()   or 0
+    local r = frame:GetRight()  or 0
+    local t = frame:GetTop()    or 0
+    local b = frame:GetBottom() or 0
+    l, r, t, b = l * s, r * s, t * s, b * s
+    if l < 0 or r > sw or b < 0 or t > sh then
+        frame:ClearAllPoints()
+        frame:SetPoint("CENTER", UIParent, "CENTER", 0, -200)
+        if ns.db then
+            ns.db.profile.position.point    = "CENTER"
+            ns.db.profile.position.relPoint = "CENTER"
+            ns.db.profile.position.xOfs     = 0
+            ns.db.profile.position.yOfs     = -200
+        end
+    end
+end
+
+------------------------------------------------------------------------
+-- Smooth lerp helper
+------------------------------------------------------------------------
+function Utils.Lerp(current, target, speed, dt)
+    if not current or not target then return target or 0 end
+    local diff = target - current
+    if math.abs(diff) < 0.001 then return target end
+    return current + diff * math.min(speed * dt, 1)
 end

@@ -14,10 +14,26 @@
     <Script file="Ace3\AceConfig-3.0\AceConfigDialog-3.0\AceConfigDialog-3.0.lua"/>
     <Script file="Ace3\AceConfig-3.0\AceConfigCmd-3.0\AceConfigCmd-3.0.lua"/>
     <Script file="Ace3\AceDBOptions-3.0\AceDBOptions-3.0.lua"/>
+    <Script file="Ace3\AceSerializer-3.0\AceSerializer-3.0.lua"/>
 
     <!-- SharedMedia -->
     <Script file="LibSharedMedia-3.0\LibSharedMedia-3.0.lua"/>
 
     <!-- Custom Glow -->
     <Script file="LibCustomGlow-1.0\LibCustomGlow-1.0.lua"/>
+
+    <!-- Smooth StatusBar -->
+    <Script file="LibSmoothStatusBar-1.0\LibSmoothStatusBar-1.0.lua"/>
+
+    <!-- DualSpec (auto profile per spec) -->
+    <Script file="LibDualSpec-1.0\LibDualSpec-1.0.lua"/>
+
+    <!-- Sink (output routing for alerts) -->
+    <Script file="LibSink-2.0\LibSink-2.0\LibSink-2.0.lua"/>
+
+    <!-- Addon Compartment (Midnight minimap menu) -->
+    <Script file="LibDBCompartment\LibDBCompartment-1.0.lua"/>
+
+    <!-- Deflate (profile import/export compression) -->
+    <Script file="LibDeflate\LibDeflate.lua"/>
 </Ui>
