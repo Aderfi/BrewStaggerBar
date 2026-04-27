@@ -1,7 +1,7 @@
 # BrewStaggerBar
 
 ![WoW Version](https://img.shields.io/badge/WoW-Midnight%2012.0-blue)
-![Version](https://img.shields.io/badge/Version-2.0.4-orange)
+![Version](https://img.shields.io/badge/Version-2.1.0-orange)
 ![License](https://img.shields.io/badge/License-GPLv3-green)
 
 Lightweight, feature-rich Brewmaster Monk stagger tracking bar for **World of Warcraft: Midnight (12.0+)**.

@@ -64,6 +64,7 @@ CUR=$(current_version)
 NEW=$(bump_version "$CUR" "$1")
 validate_version "$NEW"
 
+FINAL_ZIP="${PWD}/${ADDON_NAME}-v${NEW}.zip"
 CHANGELOG_MSG="${2:-}"
 
 echo "╔══════════════════════════════════════╗"
@@ -82,40 +83,44 @@ echo "✓ Updated $TOC_FILE"
 # 2. Update version badge in README
 #-----------------------------------------------------------------------
 if [[ -f "$README_FILE" ]]; then
-    # Update any explicit version mentions in badges or text
     sed -i "s/Version-[0-9]\+\.[0-9]\+\.[0-9]\+/Version-$NEW/g" "$README_FILE"
     echo "✓ Updated $README_FILE"
 fi
 
 #-----------------------------------------------------------------------
-# 3. Prepend changelog entry
+# 3. Compile Release Notes & Prepend to Changelog
 #-----------------------------------------------------------------------
+# Obtenemos el último tag siempre, para evitar el error "unbound variable"
+# bajo set -u, independientemente de si pasamos un mensaje manual o no.
+LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+
+if [[ -n "$CHANGELOG_MSG" ]]; then
+    RELEASE_NOTES="- $CHANGELOG_MSG"
+else
+    if [[ -n "$LAST_TAG" ]]; then
+        RELEASE_NOTES=$(git log "${LAST_TAG}..HEAD" --pretty=format:"- %s" --no-merges)
+    else
+        RELEASE_NOTES="- Release v${NEW}"
+    fi
+fi
+
 if [[ -f "$CHANGELOG_FILE" ]]; then
     TMPFILE=$(mktemp)
 
-    # Header
     echo "# StaggerBar Changelog" > "$TMPFILE"
     echo "" >> "$TMPFILE"
     echo "## v${NEW} (${DATE})" >> "$TMPFILE"
-
-    if [[ -n "$CHANGELOG_MSG" ]]; then
-        # Single message passed as argument
-        echo "- $CHANGELOG_MSG" >> "$TMPFILE"
-    else
-        # Collect git log since last tag
-        LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
-        if [[ -n "$LAST_TAG" ]]; then
-            echo "### Changes since ${LAST_TAG}:" >> "$TMPFILE"
-            git log "${LAST_TAG}..HEAD" --pretty=format:"- %s" --no-merges >> "$TMPFILE"
-        else
-            echo "- Release v${NEW}" >> "$TMPFILE"
-        fi
+    
+    # Insertar notas compiladas
+    if [[ -n "$LAST_TAG" && -z "$CHANGELOG_MSG" ]]; then
+        echo "### Changes since ${LAST_TAG}:" >> "$TMPFILE"
     fi
-
+    echo "$RELEASE_NOTES" >> "$TMPFILE"
+    
     echo "" >> "$TMPFILE"
     echo "" >> "$TMPFILE"
 
-    # Append old changelog (skip first header line to avoid duplicates)
+    # Append old changelog (skip first header line)
     tail -n +2 "$CHANGELOG_FILE" >> "$TMPFILE"
 
     mv "$TMPFILE" "$CHANGELOG_FILE"
@@ -168,14 +173,11 @@ EOF
         echo "Building release ZIP..."
         TMP_WORK_DIR=$(mktemp -d -t "${ADDON_NAME}_release_XXXXXX")
         BUILD_DIR="${TMP_WORK_DIR}/${ADDON_NAME}"
-        FINAL_ZIP="${PWD}/${ADDON_NAME}-v${NEW}.zip"
 
         mkdir -p "$BUILD_DIR"
         
-        # Extraer desde el tag recién creado
         git archive "v${NEW}" | tar -x -C "$BUILD_DIR"
 
-        # Purgado de archivos innecesarios
         find "$BUILD_DIR" -type f \( \
             -iname "*.md" -o \
             -iname "*.txt" -o \
@@ -189,25 +191,23 @@ EOF
             -name ".gitignore" \
         \) -delete
 
-        # Purgado de directorios de desarrollo
         find "$BUILD_DIR" -type d \( \
             -name "docs" -o \
             -name "examples" -o \
             -name "tests" \
         \) -prune -exec rm -rf {} +
 
-        # Subshell para empaquetar sin alterar el directorio de trabajo del script
         (
             cd "$TMP_WORK_DIR"
             zip -qr "$FINAL_ZIP" "$ADDON_NAME"
         )
         
         rm -rf "$TMP_WORK_DIR"
-        echo "✓ Release ZIP created: ${ADDON_NAME}-v${NEW}.zip"
+        echo "✓ Release ZIP created: $(basename "$FINAL_ZIP")"
     fi
 
     #-------------------------------------------------------------------
-    # 7. Push to origin
+    # 7 & 8. Push to origin & Create GitHub Release
     #-------------------------------------------------------------------
     echo ""
     read -rp "Push to origin (with tags)? [Y/n] " push_confirm
@@ -215,6 +215,28 @@ EOF
     if [[ "$push_confirm" =~ ^[Yy]$ ]]; then
         git push origin HEAD --follow-tags
         echo "✓ Pushed to origin"
+        
+        # GitHub Release solo tiene sentido si el push se ha realizado
+        echo ""
+        read -rp "Create GitHub release for v${NEW}? [Y/n] " gh_confirm
+        gh_confirm=${gh_confirm:-Y}
+        if [[ "$gh_confirm" =~ ^[Yy]$ ]]; then
+            if ! command -v gh &> /dev/null; then
+                echo "Error: GitHub CLI ('gh') no está instalado."
+                echo "Para usar esta función, instálalo con: sudo apt install gh"
+                echo "Y autentícate ejecutando: gh auth login"
+            else
+                echo "Creating GitHub release..."
+                # Si el ZIP existe, lo adjuntamos como asset de la release
+                if [[ -f "$FINAL_ZIP" ]]; then
+                    gh release create "v${NEW}" "$FINAL_ZIP" --title "v${NEW}" --notes "$RELEASE_NOTES"
+                else
+                    gh release create "v${NEW}" --title "v${NEW}" --notes "$RELEASE_NOTES"
+                    echo "  (Nota: Release creada sin adjuntar ZIP porque no fue generado)."
+                fi
+                echo "✓ GitHub release creada y publicada con éxito"
+            fi
+        fi
     else
         echo "Skipped push. Run manually:"
         echo "  git push origin HEAD --follow-tags"
