@@ -1,5 +1,15 @@
 # StaggerBar Changelog
 
+## v2.0.2 (2026-04-28)
+### Changes since v2.0.0:
+
+
+
+## v2.0.1 (2026-04-28)
+- Minor fixes for 12.0.5 compatibility issues
+
+
+
 ## v2.0.0 (2026-04-20)
 
 Major refactor — new features, new libraries, improved architecture.

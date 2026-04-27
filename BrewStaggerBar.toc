@@ -2,7 +2,7 @@
 ## Title: |cff00ccffStaggerBar|r
 ## Notes: Brewmaster Monk Stagger tracking bar with configurable colors, textures, fonts, tick display, sound alerts, sparkline history, and visibility rules. Midnight-compatible.
 ## Author: Aderfi
-## Version: 2.0.0
+## Version: 2.0.2
 ## SavedVariables: BrewStaggerBarDB
 ## IconTexture: Interface\Icons\monk_stance_drunkenox
 ## X-Category: Monk

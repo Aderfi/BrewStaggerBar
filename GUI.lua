@@ -80,7 +80,7 @@ local function SetupMinimapButton()
             end
         end,
         OnTooltipShow = function(tt)
-            tt:AddLine("|cff00ccffStaggerBar|r")
+            tt:AddLine("|cff00ccffBrewStaggerBar|r")
             tt:AddLine("Left-click: Toggle  |  Right-click: Options", 0.7, 0.7, 0.7)
         end,
     })

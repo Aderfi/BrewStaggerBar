@@ -180,7 +180,7 @@ ns.NUMBER_FORMATS = {
 }
 
 ------------------------------------------------------------------------
--- Get number of stagger ticks (20 base, 26 with Bob and Weave)
+-- Get number of stagger ticks (20 base, 30 with Bob and Weave)
 ------------------------------------------------------------------------
 function Utils.GetStaggerTicks()
     if IsPlayerSpell and IsPlayerSpell(ns.CONST.BOB_AND_WEAVE) then
