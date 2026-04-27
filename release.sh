@@ -4,14 +4,15 @@ set -euo pipefail
 #-----------------------------------------------------------------------
 # StaggerBar · release.sh
 # Usage:
-#   ./release.sh 1.2.0              — release with manual version
+#   ./release.sh 1.2.0            — release with manual version
 #   ./release.sh 1.2.0 "Fixed glow" — release with one-line changelog
 #   ./release.sh patch               — auto-bump patch  (1.1.0 → 1.1.1)
 #   ./release.sh minor               — auto-bump minor  (1.1.0 → 1.2.0)
 #   ./release.sh major               — auto-bump major  (1.1.0 → 2.0.0)
 #-----------------------------------------------------------------------
 
-TOC_FILE="BrewStaggerBar.toc"
+ADDON_NAME="BrewStaggerBar"
+TOC_FILE="${ADDON_NAME}.toc"
 README_FILE="README.md"
 CHANGELOG_FILE="CHANGELOG.md"
 DATE=$(date +%Y-%m-%d)
@@ -155,8 +156,60 @@ EOF
 
     echo ""
     echo "✓ Committed and tagged v${NEW}"
+    
+    #-------------------------------------------------------------------
+    # 6. Build clean release ZIP (Optional)
+    #-------------------------------------------------------------------
     echo ""
+    read -rp "Build clean release ZIP for v${NEW}? [Y/n] " zip_confirm
+    zip_confirm=${zip_confirm:-Y}
+    
+    if [[ "$zip_confirm" =~ ^[Yy]$ ]]; then
+        echo "Building release ZIP..."
+        TMP_WORK_DIR=$(mktemp -d -t "${ADDON_NAME}_release_XXXXXX")
+        BUILD_DIR="${TMP_WORK_DIR}/${ADDON_NAME}"
+        FINAL_ZIP="${PWD}/${ADDON_NAME}-v${NEW}.zip"
 
+        mkdir -p "$BUILD_DIR"
+        
+        # Extraer desde el tag recién creado
+        git archive "v${NEW}" | tar -x -C "$BUILD_DIR"
+
+        # Purgado de archivos innecesarios
+        find "$BUILD_DIR" -type f \( \
+            -iname "*.md" -o \
+            -iname "*.txt" -o \
+            -iname "license*" -o \
+            -iname "*.sh" -o \
+            -iname "*.json" -o \
+            -iname "*.rockspec" -o \
+            -iname "*.html" -o \
+            -iname "*.css" -o \
+            -name "logo.png" -o \
+            -name ".gitignore" \
+        \) -delete
+
+        # Purgado de directorios de desarrollo
+        find "$BUILD_DIR" -type d \( \
+            -name "docs" -o \
+            -name "examples" -o \
+            -name "tests" \
+        \) -prune -exec rm -rf {} +
+
+        # Subshell para empaquetar sin alterar el directorio de trabajo del script
+        (
+            cd "$TMP_WORK_DIR"
+            zip -qr "$FINAL_ZIP" "$ADDON_NAME"
+        )
+        
+        rm -rf "$TMP_WORK_DIR"
+        echo "✓ Release ZIP created: ${ADDON_NAME}-v${NEW}.zip"
+    fi
+
+    #-------------------------------------------------------------------
+    # 7. Push to origin
+    #-------------------------------------------------------------------
+    echo ""
     read -rp "Push to origin (with tags)? [Y/n] " push_confirm
     push_confirm=${push_confirm:-Y}
     if [[ "$push_confirm" =~ ^[Yy]$ ]]; then
