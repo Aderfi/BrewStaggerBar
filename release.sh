@@ -187,7 +187,6 @@ EOF
             -iname "*.rockspec" -o \
             -iname "*.html" -o \
             -iname "*.css" -o \
-            #-name "logo.png" -o \
             -name ".gitignore" \
         \) -delete
 
