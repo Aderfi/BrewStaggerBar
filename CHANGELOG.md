@@ -1,5 +1,10 @@
 # StaggerBar Changelog
 
+## v2.0.4 (2026-04-28)
+- Fix minor bugs and compat with 12.0.5
+
+
+
 ## v2.0.3 (2026-04-28)
 - Fix of minor bugs
 
