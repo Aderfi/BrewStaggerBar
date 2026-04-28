@@ -319,6 +319,7 @@ function Bar:Update()
     end
 
     if not stagger or not maxHP or maxHP == 0 or maxHP == 1 then
+        Utils.Debug("Bar:Update invalid unit data", "stagger=", stagger, "maxHP=", maxHP)
         f.bar:SetValue(0)
         f.labelText:SetText("")
         f.pctText:SetText("")
@@ -455,6 +456,7 @@ function Bar:Update()
     -- Compute tick (API first, then fallback)
     local tickVal = Utils.GetStaggerTickValue()
     if (not tickVal or tickVal == 0) and stagger > 0 then
+        Utils.Debug("Tick fallback used", "stagger=", stagger)
         if p.testMode then
             tickVal = stagger / 20
         else

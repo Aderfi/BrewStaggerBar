@@ -19,12 +19,16 @@ local L     = ns.L
 -- AceDB profile defaults
 ------------------------------------------------------------------------
 local DB_DEFAULTS = {
+    global = {
+        schemaVersion = 1,
+    },
     profile = {
         -- General
         locked         = false,
         updateInterval = 2,
         testMode       = false,
         smoothBar      = true,
+        debug          = false,
 
         -- Visibility
         hideOutOfCombat  = false,
@@ -149,11 +153,29 @@ local DB_DEFAULTS = {
 }
 
 ------------------------------------------------------------------------
+-- DB schema migration
+------------------------------------------------------------------------
+local DB_SCHEMA_VERSION = 1
+
+function StaggerBar:MigrateDB()
+    local g = self.db.global
+
+    -- future migrations:
+    -- if (g.schemaVersion or 0) < 2 then
+    --     ... migrate fields ...
+    --     g.schemaVersion = 2
+    -- end
+
+    g.schemaVersion = DB_SCHEMA_VERSION
+end
+
+------------------------------------------------------------------------
 -- OnInitialize
 ------------------------------------------------------------------------
 function StaggerBar:OnInitialize()
     self.db = LibStub("AceDB-3.0"):New("BrewStaggerBarDB", DB_DEFAULTS, true)
     ns.db   = self.db
+    self:MigrateDB()
 
     self.db.RegisterCallback(self, "OnProfileChanged", "RefreshConfig")
     self.db.RegisterCallback(self, "OnProfileCopied",  "RefreshConfig")
@@ -171,6 +193,63 @@ function StaggerBar:OnInitialize()
 end
 
 ------------------------------------------------------------------------
+-- Runtime event registration helpers (registered only while active)
+------------------------------------------------------------------------
+function StaggerBar:RegisterRuntimeEvents()
+    if not Bar or not Bar.frame then return end
+    local ef = Bar.frame
+    ef:RegisterEvent("PLAYER_REGEN_DISABLED")
+    ef:RegisterEvent("PLAYER_REGEN_ENABLED")
+    ef:RegisterEvent("PLAYER_UPDATE_RESTING")
+    ef:RegisterEvent("ZONE_CHANGED_NEW_AREA")
+end
+
+function StaggerBar:UnregisterRuntimeEvents()
+    if not Bar or not Bar.frame then return end
+    local ef = Bar.frame
+    ef:UnregisterEvent("PLAYER_REGEN_DISABLED")
+    ef:UnregisterEvent("PLAYER_REGEN_ENABLED")
+    ef:UnregisterEvent("PLAYER_UPDATE_RESTING")
+    ef:UnregisterEvent("ZONE_CHANGED_NEW_AREA")
+end
+
+------------------------------------------------------------------------
+-- Active/inactive runtime lifecycle
+------------------------------------------------------------------------
+function StaggerBar:SetActive(active)
+    active = not not active
+    if self._active == active then return end
+    self._active = active
+
+    if active then
+        self:RegisterRuntimeEvents()
+        Utils.Debug("SetActive: activated runtime events")
+    else
+        self:UnregisterRuntimeEvents()
+        if self._fadeTimer then self._fadeTimer:Cancel(); self._fadeTimer = nil end
+        self._combatFading = false
+        if Bar and Bar.frame then
+            Bar.frame.elapsed = 0
+            Bar.frame.lastSoundTime = nil
+            Bar.frame.lastLogTier = nil
+            if Bar.frame.sparkFrame then Bar.frame.sparkFrame.data = {} end
+        end
+        if Bar then
+            Bar:Hide()
+            Bar:StopGlow()
+        end
+        Utils.Debug("SetActive: deactivated runtime events")
+    end
+end
+
+function StaggerBar:RefreshActiveState()
+    local active = (self.db and self.db.profile and self.db.profile.testMode == true)
+                   or Utils.IsBrewing()
+    self:SetActive(active)
+    self:UpdateVisibility()
+end
+
+------------------------------------------------------------------------
 -- OnEnable
 ------------------------------------------------------------------------
 function StaggerBar:OnEnable()
@@ -179,6 +258,7 @@ function StaggerBar:OnEnable()
 
     -- OnUpdate loop (dt is real elapsed seconds from the engine)
     Bar.frame:SetScript("OnUpdate", function(frame, dt)
+        if not self._active then return end
         frame.elapsed = frame.elapsed + dt
         local interval = 1 / (frame.updatesPerSec or 2)
         if frame.elapsed < interval then return end
@@ -187,16 +267,15 @@ function StaggerBar:OnEnable()
         Bar:Update()
     end)
 
-    -- Spec / zone / combat events
+    -- Lightweight lifecycle events — always registered
     local ef = Bar.frame
-    ef:RegisterEvent("PLAYER_SPECIALIZATION_CHANGED")
+    ef:RegisterUnitEvent("PLAYER_SPECIALIZATION_CHANGED", "player")
     ef:RegisterEvent("PLAYER_ENTERING_WORLD")
     ef:RegisterEvent("PLAYER_TALENT_UPDATE")
-    ef:RegisterEvent("PLAYER_REGEN_DISABLED")   -- entered combat
-    ef:RegisterEvent("PLAYER_REGEN_ENABLED")    -- left combat
-    ef:RegisterEvent("PLAYER_UPDATE_RESTING")   -- entered/left town
-    ef:RegisterEvent("ZONE_CHANGED_NEW_AREA")
-    ef:SetScript("OnEvent", function(_, event)
+
+    ef:SetScript("OnEvent", function(_, event, unit)
+        if event == "PLAYER_SPECIALIZATION_CHANGED" and unit ~= "player" then return end
+
         if event == "PLAYER_REGEN_DISABLED" then
             -- Entered combat — cancel any pending fade and show
             self._combatFading = false
@@ -215,11 +294,12 @@ function StaggerBar:OnEnable()
                 self:UpdateVisibility()
             end
         else
-            self:UpdateVisibility()
+            -- spec/talent/world changes — re-evaluate active state
+            self:RefreshActiveState()
         end
     end)
 
-    self:UpdateVisibility()
+    self:RefreshActiveState()
     self:Print(L["StaggerBar"] .. " loaded.  /bsb help")
 end
 
@@ -231,7 +311,10 @@ function StaggerBar:UpdateVisibility()
     local p = self.db.profile
 
     -- Test mode always visible
-    if p.testMode then Bar:Show(); return end
+    if p.testMode == true then Bar:Show(); return end
+
+    -- Inactive (non-Brewmaster, no test mode) — keep hidden
+    if not self._active then Bar:Hide(); return end
 
     -- Must be Brewmaster
     if not Utils.IsBrewing() then Bar:Hide(); return end
@@ -260,7 +343,7 @@ function StaggerBar:RefreshConfig()
     ns.db = self.db
     if Bar.frame then
         Bar:ApplySettings()
-        self:UpdateVisibility()
+        self:RefreshActiveState()
     end
 end
 
@@ -271,6 +354,10 @@ function StaggerBar:SlashHandler(input)
     input = (input or ""):trim():lower()
 
     if input == "" or input == "toggle" then
+        if self.db.profile.testMode ~= true and not Utils.IsBrewing() then
+            self:Print("BrewStaggerBar is only active for Brewmaster Monk.")
+            return
+        end
         if Bar:IsShown() then Bar:Hide(); self:Print("Hidden")
         else Bar:Show(); self:Print("Shown") end
 

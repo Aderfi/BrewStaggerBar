@@ -74,6 +74,12 @@ local function SetupMinimapButton()
         label = "BrewStaggerBar",
         OnClick = function(_, button)
             if button == "LeftButton" then
+                if not (ns.db and ns.db.profile and ns.db.profile.testMode == true) and not ns.Utils.IsBrewing() then
+                    if ns.addon and ns.addon.Print then
+                        ns.addon:Print("BrewStaggerBar is only active for Brewmaster Monk.")
+                    end
+                    return
+                end
                 if Bar:IsShown() then Bar:Hide() else Bar:Show() end
             elseif button == "RightButton" then
                 ns:OpenConfig()

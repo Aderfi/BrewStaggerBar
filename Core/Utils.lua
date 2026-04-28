@@ -11,15 +11,16 @@ local Utils = ns.Utils
 -- Constants (centralized)
 ------------------------------------------------------------------------
 ns.CONST = {
-    STAGGER_LIGHT    = 124273,
-    STAGGER_MODERATE = 124274,
-    STAGGER_HEAVY    = 124275,
-    BOB_AND_WEAVE    = 280515,
-    BASE_TICKS       = 20,    -- 10s / 0.5s
-    BAW_TICKS        = 26,    -- 13s / 0.5s (Bob and Weave)
-    TICK_RATE        = 0.5,   -- seconds per tick
-    PURIFY_PCT       = 0.50,  -- Purifying Brew clears 50%
-    TIER_THRESHOLDS  = { 0.30, 0.60, 1.00 },  -- Light/Moderate/Heavy boundaries
+    STAGGER_LIGHT      = 124273,
+    STAGGER_MODERATE   = 124274,
+    STAGGER_HEAVY      = 124275,
+    BOB_AND_WEAVE      = 280515,
+    BREWMASTER_SPEC_ID = 268,     -- Brewmaster Monk specialization ID
+    BASE_TICKS         = 20,    -- 10s / 0.5s
+    BAW_TICKS          = 26,    -- 13s / 0.5s (Bob and Weave)
+    TICK_RATE          = 0.5,   -- seconds per tick
+    PURIFY_PCT         = 0.50,  -- Purifying Brew clears 50%
+    TIER_THRESHOLDS    = { 0.30, 0.60, 1.00 },  -- Light/Moderate/Heavy boundaries
 }
 
 -- Backward compat aliases
@@ -151,8 +152,20 @@ end
 function Utils.IsBrewing()
     local _, class = UnitClass("player")
     if class ~= "MONK" then return false end
-    local spec = GetSpecialization()
-    return spec == 1
+
+    local specIndex = GetSpecialization()
+    if not specIndex then return false end
+
+    local specID = GetSpecializationInfo(specIndex)
+    return specID == ns.CONST.BREWMASTER_SPEC_ID
+end
+
+------------------------------------------------------------------------
+-- Debug print — only when ns.db.profile.debug is true
+------------------------------------------------------------------------
+function Utils.Debug(...)
+    if not (ns.db and ns.db.profile and ns.db.profile.debug) then return end
+    print("|cff00ccffBrewStaggerBar|r [debug]:", ...)
 end
 
 ------------------------------------------------------------------------

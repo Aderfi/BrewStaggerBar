@@ -61,6 +61,8 @@ All types share color picker and X/Y offset controls. Glow triggers at a configu
 
 ### Visibility Rules
 - Auto-show only when playing Brewmaster spec
+- Brewmaster detection uses **Monk class + spec ID 268**
+- Runtime updates/events are disabled automatically outside Brewmaster (except Test Mode)
 - Hide out of combat (with configurable fade delay in seconds)
 - Hide in rest areas / cities
 - Hide when stagger is zero (full HP)
