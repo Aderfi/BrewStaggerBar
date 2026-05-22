@@ -3,33 +3,6 @@
 ## v2.3.0 (2026-04-28)
 - Fix minor bugs and compat with 12.0.5
 
-
-
-## v2.2.0 (2026-04-28)
-- Fix minor bugs and compat with 12.0.5
-
-
-
-## v2.1.0 (2026-04-28)
-- Fix minor bugs and compat with 12.0.5
-
-
-
-## v2.0.4 (2026-04-28)
-- Fix minor bugs and compat with 12.0.5
-
-
-
-## v2.0.3 (2026-04-28)
-- Fix of minor bugs
-
-
-
-## v2.0.2 (2026-04-28)
-### Changes since v2.0.0:
-
-
-
 ## v2.0.1 (2026-04-28)
 - Minor fixes for 12.0.5 compatibility issues
 
