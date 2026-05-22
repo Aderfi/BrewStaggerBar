@@ -1,5 +1,13 @@
 # StaggerBar Changelog
 
+## v2.4.0 (2026-05-22)
+### Changes since v2.3.0:
+- Add bar position controls and update default settings
+- Fix LibDBCompartment registration and stagger taint errors
+- Clean up obsolete changelog entries
+
+
+
 ## v2.3.0 (2026-04-28)
 - Fix minor bugs and compat with 12.0.5
 
