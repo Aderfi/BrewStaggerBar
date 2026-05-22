@@ -1,5 +1,12 @@
 # StaggerBar Changelog
 
+## v2.4.1 (2026-05-22)
+### Changes since v2.4.0:
+- Add CurseForge packaging config
+- Move LibStub and CallbackHandler to Libraries root
+
+
+
 ## v2.4.0 (2026-05-22)
 ### Changes since v2.3.0:
 - Add bar position controls and update default settings
