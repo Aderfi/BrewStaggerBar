@@ -10,8 +10,10 @@ local Bar = ns.Bar
 ------------------------------------------------------------------------
 -- Shared dropdown values (defined in Core/Utils.lua as ns.*)
 ------------------------------------------------------------------------
-local ANCHOR_VALUES       = ns.ANCHOR_POINTS
-local OUTLINE_VALUES      = ns.OUTLINE_STYLES
+local ANCHOR_VALUES        = ns.ANCHOR_POINTS
+local ANCHOR_FRAME_VALUES  = ns.ANCHOR_FRAMES
+local ANCHOR_FRAME_ORDER   = { "UIParent", "PlayerFrame", "ElvUF_Player", "EssentialViewer", "AyijeCDM", "Custom" }
+local OUTLINE_VALUES       = ns.OUTLINE_STYLES
 local NUMBER_FORMAT_VALUES = ns.NUMBER_FORMATS
 
 local TIER_VALUES = {
@@ -245,6 +247,94 @@ function ns.BuildOptions()
                         type = "color", order = 13, hasAlpha = true,
                         get = function() local c = ns.db.profile.borderColor; return c[1],c[2],c[3],c[4] end,
                         set = function(_,r,g,b,a) ns.db.profile.borderColor = {r,g,b,a}; Refresh() end,
+                    },
+                },
+            },
+
+            --------------------------------------------------------
+            -- TAB 2.5: Position
+            --------------------------------------------------------
+            position = {
+                name = L["Position"],
+                type = "group",
+                order = 2.5,
+                args = {
+                    descTop = {
+                        name = L["Position Desc"],
+                        type = "description", order = 0, fontSize = "medium",
+                    },
+                    anchorTo = {
+                        name = L["Anchor To Frame"],
+                        desc = L["Anchor To Frame Desc"],
+                        type = "select", order = 1, width = "double",
+                        values = ANCHOR_FRAME_VALUES,
+                        sorting = ANCHOR_FRAME_ORDER,
+                        get = function() return ns.db.profile.position.anchorTo or "UIParent" end,
+                        set = function(_, v) ns.db.profile.position.anchorTo = v; Refresh() end,
+                    },
+                    customFrame = {
+                        name = L["Custom Frame Name"],
+                        desc = L["Custom Frame Name Desc"],
+                        type = "input", order = 2, width = "double",
+                        hidden = function() return ns.db.profile.position.anchorTo ~= "Custom" end,
+                        get = function() return ns.db.profile.position.customFrame or "" end,
+                        set = function(_, v) ns.db.profile.position.customFrame = v; Refresh() end,
+                    },
+
+                    hdrAnchorPoints = { name = L["Anchor Points"], type = "header", order = 10 },
+
+                    point = {
+                        name = L["Bar Anchor Point"],
+                        desc = L["Bar Anchor Point Desc"],
+                        type = "select", order = 11,
+                        values = ANCHOR_VALUES,
+                        get = function() return ns.db.profile.position.point or "CENTER" end,
+                        set = function(_, v) ns.db.profile.position.point = v; Refresh() end,
+                    },
+                    relPoint = {
+                        name = L["Frame Anchor Point"],
+                        desc = L["Frame Anchor Point Desc"],
+                        type = "select", order = 12,
+                        values = ANCHOR_VALUES,
+                        get = function() return ns.db.profile.position.relPoint or "CENTER" end,
+                        set = function(_, v) ns.db.profile.position.relPoint = v; Refresh() end,
+                    },
+
+                    hdrOffsets = { name = L["Offsets"], type = "header", order = 20 },
+
+                    xOfs = {
+                        name = L["X Position"],
+                        desc = L["X Position Desc"],
+                        type = "range", order = 21,
+                        min = -2000, max = 2000, step = 1, bigStep = 1,
+                        softMin = -800, softMax = 800,
+                        get = function() return ns.db.profile.position.xOfs or 0 end,
+                        set = function(_, v) ns.db.profile.position.xOfs = v; Refresh() end,
+                    },
+                    yOfs = {
+                        name = L["Y Position"],
+                        desc = L["Y Position Desc"],
+                        type = "range", order = 22,
+                        min = -2000, max = 2000, step = 1, bigStep = 1,
+                        softMin = -800, softMax = 800,
+                        get = function() return ns.db.profile.position.yOfs or 0 end,
+                        set = function(_, v) ns.db.profile.position.yOfs = v; Refresh() end,
+                    },
+
+                    resetBtn = {
+                        name = L["Reset Position"],
+                        desc = L["Reset Position Desc"],
+                        type = "execute", order = 30,
+                        func = function()
+                            local pos = ns.db.profile.position
+                            pos.anchorTo    = "UIParent"
+                            pos.customFrame = ""
+                            pos.point       = "CENTER"
+                            pos.relPoint    = "CENTER"
+                            pos.xOfs        = 0
+                            pos.yOfs        = -200
+                            Refresh()
+                        end,
                     },
                 },
             },

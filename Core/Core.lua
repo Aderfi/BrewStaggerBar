@@ -19,6 +19,9 @@ local L     = ns.L
 -- AceDB profile defaults
 ------------------------------------------------------------------------
 local DB_DEFAULTS = {
+    global = {
+        schemaVersion = 1,
+    },
     profile = {
         -- General
         locked         = false,
@@ -28,25 +31,27 @@ local DB_DEFAULTS = {
 
         -- Visibility
         hideOutOfCombat  = false,
-        hideInTown       = false,
+        hideInTown       = false,  -- do NOT hide the bar in cities/rest areas
         hideAtFullHP     = false,
         combatFadeDelay  = 3,      -- seconds to wait after combat ends before hiding
 
         -- Bar
-        barWidth    = 250,
+        barWidth    = 320,
         barHeight   = 22,
         barTexture  = "Blizzard",
-        bgOpacity   = 0.5,
+        bgOpacity   = 0.2,
         barOrientation = "HORIZONTAL",  -- HORIZONTAL or VERTICAL
         barMaxPct = 10,                -- max % of HP for bar scaling (e.g. 10 = 1000%)
         barOverflowWrap = false,       -- false = clamp at max, true = refill cyclically
 
         -- Position
         position = {
-            point    = "CENTER",
-            relPoint = "CENTER",
-            xOfs     = 0,
-            yOfs     = -200,
+            anchorTo    = "UIParent",   -- key in ns.ANCHOR_FRAMES
+            customFrame = "",            -- used when anchorTo == "Custom"
+            point       = "CENTER",
+            relPoint    = "CENTER",
+            xOfs        = 0,
+            yOfs        = -193,
         },
 
         -- Border
@@ -66,7 +71,7 @@ local DB_DEFAULTS = {
         -- Text — templates (use flags: %s %r %p %t %d %tp %m %n %a %purify)
         labelTemplate = "%d (%tp)",
         pctTemplate   = "%p",
-        tickTemplate  = "%d/s  (%tp)",
+        tickTemplate  = "",
 
         -- Global font (fallback)
         fontFace     = "Friz Quadrata TT",
@@ -79,14 +84,14 @@ local DB_DEFAULTS = {
         labelFontOutline = nil,
         labelAnchor  = "LEFT",
         labelXOfs    = 4,
-        labelYOfs    = 0,
+        labelYOfs    = 7,
 
         -- Text — percentage
         showPercentage   = true,
         pctFontFace      = nil,
         pctFontSize      = nil,
         pctFontOutline   = nil,
-        pctAnchor        = "RIGHT",
+        pctAnchor        = "CENTER",
         pctXOfs          = -4,
         pctYOfs          = 0,
 
@@ -123,13 +128,13 @@ local DB_DEFAULTS = {
         glowEnabled    = true,
         glowTier       = 4,
         glowType       = "AutoCast",     -- Pixel, AutoCast, Button, Proc
-        glowColor      = { 1, 0, 0, 0.8 },
+        glowColor      = { 0.02352941408753395, 0.9372549653053284, 1, 1 },
         glowXOffset    = 0,
-        glowYOffset    = 0,
+        glowYOffset    = 1,
 
         -- Pixel glow params
         glowPixelLines     = 8,
-        glowPixelFrequency = 0.25,
+        glowPixelFrequency = 0.3,
         glowPixelLength    = nil,       -- nil = auto
         glowPixelThickness = 2,
         glowPixelBorder    = false,
@@ -145,6 +150,8 @@ local DB_DEFAULTS = {
         -- Proc glow params
         glowProcDuration   = 1,
         glowProcStartAnim  = true,
+
+        debug = false,
     },
 }
 
@@ -154,6 +161,8 @@ local DB_DEFAULTS = {
 function StaggerBar:OnInitialize()
     self.db = LibStub("AceDB-3.0"):New("BrewStaggerBarDB", DB_DEFAULTS, true)
     ns.db   = self.db
+    self:MigrateDB()
+
 
     self.db.RegisterCallback(self, "OnProfileChanged", "RefreshConfig")
     self.db.RegisterCallback(self, "OnProfileCopied",  "RefreshConfig")
@@ -171,39 +180,58 @@ function StaggerBar:OnInitialize()
 end
 
 ------------------------------------------------------------------------
+-- RegusterRuntime
+------------------------------------------------------------------------
+function StaggerBar:RegisterRuntimeEvents()
+    if not Bar or not Bar.frame then return end
+    local ef = Bar.frame
+    ef:RegisterEvent("PLAYER_REGEN_DISABLED")
+    ef:RegisterEvent("PLAYER_REGEN_ENABLED")
+    ef:RegisterEvent("PLAYER_UPDATE_RESTING")
+    ef:RegisterEvent("ZONE_CHANGED_NEW_AREA")
+end
+
+function StaggerBar:UnregisterRuntimeEvents()
+    if not Bar or not Bar.frame then return end
+    local ef = Bar.frame
+    ef:UnregisterEvent("PLAYER_REGEN_DISABLED")
+    ef:UnregisterEvent("PLAYER_REGEN_ENABLED")
+    ef:UnregisterEvent("PLAYER_UPDATE_RESTING")
+    ef:UnregisterEvent("ZONE_CHANGED_NEW_AREA")
+end
+
+------------------------------------------------------------------------
 -- OnEnable
 ------------------------------------------------------------------------
 function StaggerBar:OnEnable()
     Bar:Create()
     Bar:ApplySettings()
 
-    -- OnUpdate loop (dt is real elapsed seconds from the engine)
+    -- OnUpdate loop
     Bar.frame:SetScript("OnUpdate", function(frame, dt)
+        if not self._active then return end
         frame.elapsed = frame.elapsed + dt
         local interval = 1 / (frame.updatesPerSec or 2)
         if frame.elapsed < interval then return end
-        frame.dt = frame.elapsed       -- pass real dt to Update
+        frame.dt = frame.elapsed
         frame.elapsed = 0
         Bar:Update()
     end)
 
-    -- Spec / zone / combat events
     local ef = Bar.frame
-    ef:RegisterEvent("PLAYER_SPECIALIZATION_CHANGED")
+    ef:RegisterUnitEvent("PLAYER_SPECIALIZATION_CHANGED", "player")
     ef:RegisterEvent("PLAYER_ENTERING_WORLD")
     ef:RegisterEvent("PLAYER_TALENT_UPDATE")
-    ef:RegisterEvent("PLAYER_REGEN_DISABLED")   -- entered combat
-    ef:RegisterEvent("PLAYER_REGEN_ENABLED")    -- left combat
-    ef:RegisterEvent("PLAYER_UPDATE_RESTING")   -- entered/left town
-    ef:RegisterEvent("ZONE_CHANGED_NEW_AREA")
-    ef:SetScript("OnEvent", function(_, event)
+
+    ef:SetScript("OnEvent", function(_, event, unit)
+        if event == "PLAYER_SPECIALIZATION_CHANGED" and unit ~= "player" then return end
+
         if event == "PLAYER_REGEN_DISABLED" then
-            -- Entered combat — cancel any pending fade and show
             self._combatFading = false
             if self._fadeTimer then self._fadeTimer:Cancel(); self._fadeTimer = nil end
             self:UpdateVisibility()
+            return
         elseif event == "PLAYER_REGEN_ENABLED" then
-            -- Left combat — start fade delay if configured
             local delay = self.db.profile.combatFadeDelay or 3
             if self.db.profile.hideOutOfCombat and delay > 0 then
                 self._combatFading = true
@@ -214,13 +242,15 @@ function StaggerBar:OnEnable()
             else
                 self:UpdateVisibility()
             end
-        else
-            self:UpdateVisibility()
+            return
         end
-    end)
 
-    self:UpdateVisibility()
-    self:Print(L["StaggerBar"] .. " loaded.  /bsb help")
+        -- spec/talent/world changes
+        self:RefreshActiveState()
+end)
+
+self:RefreshActiveState()
+self:Print(L["StaggerBar"] .. " loaded.  /bsb help")
 end
 
 ------------------------------------------------------------------------
@@ -271,8 +301,13 @@ function StaggerBar:SlashHandler(input)
     input = (input or ""):trim():lower()
 
     if input == "" or input == "toggle" then
-        if Bar:IsShown() then Bar:Hide(); self:Print("Hidden")
-        else Bar:Show(); self:Print("Shown") end
+    if not self.db.profile.testMode and not Utils.IsBrewing() then
+        self:Print("BrewStaggerBar is only active for Brewmaster Monk.")
+        return
+    end
+
+    if Bar:IsShown() then Bar:Hide(); self:Print("Hidden")
+    else Bar:Show(); self:Print("Shown") end
 
     elseif input == "lock" then
         self.db.profile.locked = not self.db.profile.locked
@@ -402,4 +437,52 @@ function StaggerBar:ImportProfile(encoded)
     end
     self:RefreshConfig()
     self:Print("|cff00FF00Profile imported successfully.|r")
+end
+
+------------------------------------------------------------------------
+--- Migration framework for future DB schema changes (currently unused)
+------------------------------------------------------------------------
+
+local DB_SCHEMA_VERSION = 1
+
+function StaggerBar:MigrateDB()
+    local g = self.db.global
+    g.schemaVersion = g.schemaVersion or 1
+
+    -- future migrations:
+    -- if g.schemaVersion < 2 then
+    --     ... migrate fields ...
+    --     g.schemaVersion = 2
+    -- end
+
+    g.schemaVersion = DB_SCHEMA_VERSION
+end
+
+function StaggerBar:SetActive(active)
+    active = not not active
+    if self._active == active then return end
+    self._active = active
+
+    if active then
+        self:RegisterRuntimeEvents()
+        Utils.Debug("Activated runtime events")
+    else
+        self:UnregisterRuntimeEvents()
+        if self._fadeTimer then self._fadeTimer:Cancel(); self._fadeTimer = nil end
+        self._combatFading = false
+        if Bar and Bar.frame then
+            Bar.frame.elapsed = 0
+        end
+        if Bar then
+            Bar:Hide()
+            Bar:StopGlow()
+        end
+        Utils.Debug("Deactivated runtime events")
+    end
+end
+
+function StaggerBar:RefreshActiveState()
+    local active = self.db and self.db.profile and self.db.profile.testMode or Utils.IsBrewing()
+    self:SetActive(active)
+    self:UpdateVisibility()
 end
