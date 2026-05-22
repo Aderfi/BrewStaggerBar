@@ -1,0 +1,40 @@
+# CurseForge packaging metadata for BrewStaggerBar.
+# Reference: https://github.com/BigWigsMods/packager
+
+package-as: BrewStaggerBar
+
+# Libraries are vendored under Libraries/ and loaded directly from the .toc;
+# do not generate a separate "no-libs" variant.
+enable-nolib-creation: no
+
+# Use the project's own CHANGELOG.md as the upload changelog instead of
+# letting CurseForge auto-generate one from commit messages.
+manual-changelog: CHANGELOG.md
+
+# Files / folders excluded from the packaged zip. Dot-files (.git, .github,
+# .vscode, .gitignore, .pkgmeta itself) are auto-ignored by the packager.
+ignore:
+    # Repo metadata and tooling
+    - README.md
+    - CHANGELOG.md
+    - LICENSE
+    - logo.png
+    - release.sh
+    - CLAUDE_ERRORS.md
+
+    # Library-bundled docs / changelogs / licenses / dev artifacts
+    - Libraries/LibCustomGlow-1.0/cspell.json
+    - Libraries/LibCustomGlow-1.0/LICENSE
+    - Libraries/LibCustomGlow-1.0/README.md
+    - Libraries/LibDBCompartment/CHANGELOG.md
+    - Libraries/LibDeflate/changelog.md
+    - Libraries/LibDeflate/docs
+    - Libraries/LibDeflate/examples
+    - Libraries/LibDeflate/libdeflate-1.0.2-1.rockspec
+    - Libraries/LibDeflate/LICENSE.txt
+    - Libraries/LibDeflate/README.md
+    - Libraries/LibDualSpec-1.0/CHANGES.txt
+    - Libraries/LibSink-2.0/CHANGES.txt
+    - Libraries/LibSmoothStatusBar-1.0/Changelog-LibSmoothStatusBar-1.0-1.2.4.txt
+    - Libraries/LibSmoothStatusBar-1.0/LibStub/tests
+    - Libraries/LibDeflate/LibStub/tests
