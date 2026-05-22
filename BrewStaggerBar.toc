@@ -9,6 +9,8 @@
 ## X-License: GNUv3
 
 # Libraries
+Libraries\LibStub.lua
+Libraries\CallbackHandler-1.0.lua
 Libraries\init.xml
 
 # Locales
