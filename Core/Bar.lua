@@ -113,13 +113,22 @@ function Bar:Create()
 
     f:SetScript("OnDragStop", function(self)
         self:StopMovingOrSizing()
-        if ns.db then
-            local point, _, relPoint, x, y = self:GetPoint()
-            ns.db.profile.position.point    = point
-            ns.db.profile.position.relPoint = relPoint
-            ns.db.profile.position.xOfs     = x
-            ns.db.profile.position.yOfs     = y
-        end
+        if not ns.db then return end
+        local pos = ns.db.profile.position
+        local anchor = ns.GetAnchorFrame(pos.anchorTo or "UIParent", pos.customFrame) or UIParent
+
+        -- Recompute X/Y so the bar stays at its new screen position
+        -- relative to the user-chosen anchor frame, preserving their
+        -- point/relPoint choices.
+        local point    = pos.point    or "CENTER"
+        local relPoint = pos.relPoint or "CENTER"
+        local bx, by = ns.GetCornerPos(self,   point)
+        local ax, ay = ns.GetCornerPos(anchor, relPoint)
+        pos.xOfs = bx - ax
+        pos.yOfs = by - ay
+
+        self:ClearAllPoints()
+        self:SetPoint(point, anchor, relPoint, pos.xOfs, pos.yOfs)
     end)
 
     -- Tooltip
@@ -166,7 +175,8 @@ function Bar:ApplySettings()
     -- Geometry & position
     f:SetSize(p.barWidth, p.barHeight)
     f:ClearAllPoints()
-    f:SetPoint(p.position.point, UIParent, p.position.relPoint, p.position.xOfs, p.position.yOfs)
+    local anchorFrame = ns.GetAnchorFrame(p.position.anchorTo or "UIParent", p.position.customFrame) or UIParent
+    f:SetPoint(p.position.point, anchorFrame, p.position.relPoint, p.position.xOfs, p.position.yOfs)
 
     -- Clamp to screen (recover bar if offscreen after resolution change)
     C_Timer.After(0, function() Utils.ClampToScreen(f) end)
@@ -452,13 +462,15 @@ function Bar:Update()
         end
     end
 
-    -- Compute tick (API first, then fallback)
+    -- Compute tick (API first, then fallback). All math on `stagger` is
+    -- wrapped because UnitStagger may return a tainted "secret number".
     local tickVal = Utils.GetStaggerTickValue()
-    if (not tickVal or tickVal == 0) and stagger > 0 then
+    local staggerPositive = Utils.SafeOp(function() return stagger > 0 end, false)
+    if (not tickVal or tickVal == 0) and staggerPositive then
         if p.testMode then
-            tickVal = stagger / 20
+            tickVal = Utils.SafeDiv(stagger, 20)
         else
-            tickVal = stagger / Utils.GetStaggerTicks()
+            tickVal = Utils.SafeDiv(stagger, Utils.GetStaggerTicks())
         end
     end
     tickVal = tickVal or 0
@@ -466,13 +478,15 @@ function Bar:Update()
     local dps = tickVal * 2
     local tickHpPct = 0
     if maxHP > 0 and dps > 0 then
-        tickHpPct = math.floor(Utils.SafeDiv(dps, maxHP) * 1000) / 100
+        local safeDiv = Utils.SafeDiv(dps, maxHP)
+        if safeDiv then tickHpPct = math.floor(safeDiv * 1000) / 100 end
     end
 
-    -- Build data table for templates
+    -- Build data table for templates (sanitize stagger for display).
+    local staggerFloored = Utils.SafeOp(function() return math.floor(stagger) end, 0)
     local data = {
         stagger    = stagger,
-        rawStagger = tostring(math.floor(stagger)),
+        rawStagger = tostring(staggerFloored),
         maxHP      = maxHP,
         pctStr     = math.floor(pct * 100),
         tick       = tickVal,

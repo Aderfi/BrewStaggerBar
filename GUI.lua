@@ -36,6 +36,7 @@ local function RegisterDialogPanel()
     local tabs = {
         { key = "general",   name = L["General"] },
         { key = "bar",       name = L["Bar"] },
+        { key = "position",  name = L["Position"] },
         { key = "colors",    name = L["Colors"] },
         { key = "glow",      name = "Glow" },
         { key = "text",      name = L["Text"] },
@@ -90,7 +91,9 @@ local function SetupMinimapButton()
 
     -- LibDBCompartment — Midnight addon compartment button
     local LDC = LibStub("LibDBCompartment-1.0", true)
-    if LDC then LDC:Register(dataObj) end
+    if LDC and not LDC:IsRegistered(ADDON_NAME) then
+        LDC:Register(ADDON_NAME, dataObj)
+    end
 end
 
 ------------------------------------------------------------------------
